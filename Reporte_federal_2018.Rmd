@@ -1,0 +1,294 @@
+---
+title: \vspace{1.2cm} \bf{\Large{Estimación de los resultados de la votación para la elección de la Presidencia de los Estados Unidos Mexicanos 2018}}
+output:
+  pdf_document:
+    keep_tex: true
+    includes:
+        in_header: styles/mystyle.sty
+---
+
+```{r setup, echo = FALSE}
+  options(warn=-1)
+  
+  knitr::opts_chunk$set(warning = FALSE)
+  knitr::opts_chunk$set(message = FALSE)
+  knitr::opts_chunk$set(include= FALSE)
+  
+  suppressPackageStartupMessages(library(tidyverse,
+                           warn.conflicts = FALSE, 
+                           quietly = TRUE)) 
+  suppressPackageStartupMessages(library(kableExtra,
+                           warn.conflicts = FALSE,
+                           quietly = TRUE))
+  suppressPackageStartupMessages(library(png,
+                           warn.conflicts = FALSE,
+                           quietly = TRUE))
+  
+  ggplot2::theme_set(theme_classic())
+  
+  options(warn=0)
+
+```
+
+
+```{r funciones_utiles, echo = FALSE}
+
+# Función para imprimir porcentajes en tablas y gráficas
+porcentaje <- function(x, digits=2) {
+  # x es un número entre 0 y 1. Regresa 100x% como caracter
+  paste0(round(x, digits = digits), "%")
+}
+
+
+# Función para imprimir la hora
+format_hora <- function(x){
+  # x es un caracter de cuatro digitos en formato
+  # hhmm. Regresa hh:mm como caracter
+  if(nchar(x)!= 4){
+    return(x) 
+    }else{
+      hh <- substr(x, start = 1, stop = 2)
+      mm <- substr(x, start = 3, stop = 4)
+      hora <- paste0(hh, ":", mm)
+      return(hora)
+    }
+}
+
+```
+
+
+
+```{r code_setup, echo = FALSE}
+
+
+#dir.analisis <- "C:/Users/giank/Dropbox/COTECORA/10_57_121_1/mendoza/compulsadofederal/"
+dir.analisis <- "//10.57.121.1/mendoza/compulsadofederal/"
+files.analisis <- dir(dir.analisis)
+
+#dir.remesa <- "C:/Users/giank/Dropbox/COTECORA/10_57_121_1/unicom/cortes/presidencia/"
+dir.remesa <- "//10.57.121.1/unicom/cortes/presidencia/"
+
+
+
+# Obtén análisis ####
+# Encuentra todos los análisis
+analisis <- files.analisis[stringr::str_detect(string = files.analisis,
+                                               pattern = 'compulsado00')]
+
+# Obtén día y hora y determina cuál es el último
+dia <- stringr::str_sub(string = analisis,
+                        start = 13,
+                        end = 14)
+dia <- dia[length(dia)]
+hora <- stringr::str_sub(string = analisis,
+                             start = 15,
+                             end = 18)
+hora <- hora[length(hora)]
+
+
+
+#hora <- "2200" # Se puede editar a mano si es necesario
+
+
+# Lee último análisis y remesa ####
+analisis <- read_csv(paste0(dir.analisis,
+                            "compulsado00",
+                            dia,
+                            hora,
+                            ".csv"))
+
+remesa <- read_delim(paste0(dir.remesa,
+                            "REMESAS0100",
+                            dia,
+                            hora,
+                            ".txt"),
+                     delim = "|",
+                     skip = 1)
+
+
+# Crea gráfica
+max.x <- analisis %>% 
+  dplyr::filter(LMU == 2) %>% 
+  dplyr::select(RAC:JHRC) %>% 
+  as.double() %>% 
+  max()
+max.x <- max.x + 15
+
+colores <- c("JHRC" = "#5D2B74",
+             "AMLO" = "#A23124",
+             "JAMK" = "#E92530",
+             "RAC" = "#0A599A")
+
+grafica <- analisis %>%
+  dplyr::arrange(LMU) %>% 
+  dplyr::mutate(LMU = c("inf", "med", "sup")) %>% 
+  dplyr::select(-EQ, -EN, -R, -PART) %>% 
+  tidyr::gather(Partido, Votos, RAC:JHRC) %>% 
+  tidyr::spread(LMU, Votos) %>%
+  ggplot(aes(x = Partido, y = med, fill = Partido)) +
+  geom_bar(stat = "identity",
+           alpha = 0.8) +
+  geom_text(aes(x = Partido,
+                y = med,
+                label = paste0("[",
+                               porcentaje(inf, 1),
+                               " - ",
+                               porcentaje(sup, 1),
+                               "]")),
+            hjust = -0.1) +
+  labs(x = "Candidato (Partido / coalición / independiente)",
+       y = "Estimación de la votación",
+       fill = "Candidato") +
+  scale_y_continuous(labels = porcentaje,
+                     limits = c(0, max.x)) +
+  scale_x_discrete(limits = c("JHRC",
+                              "AMLO",
+                              "JAMK",
+                              "RAC"),
+                   labels = c("JHRC\n(Ind)",
+                              "AMLO\n(PT_MORENA_PES)",
+                              "JAMK\n(PRI_PVEM_PNA)",
+                              "RAC\n(PAN_PRD_MC)")) +
+  scale_fill_manual(values = colores,
+                    breaks = c("RAC",
+                               "JAMK",
+                               "AMLO",
+                               "JHRC")) +
+  theme(legend.position = "none") +
+  coord_flip()
+
+ggplot2::ggsave(filename = "GraficaReporte_nacional.png")
+
+
+
+
+```
+
+
+
+
+
+
+\large Con los datos recibidos a las `r format_hora(hora)` hora del centro, del 2 de julio de 2018, el Comité Técnico Asesor informa lo siguiente: 
+
+1. De las 7,787 casillas que integran la muestra, se recibió información de `r scales::comma(nrow(remesa))` casillas, las cuales representan el `r porcentaje(100*nrow(remesa)/7787, digits = 1)` de la muestra total.
+2. De los 350 estratos considerados para definir el diseño muestral, se contó con información de `r n_distinct(remesa$ID_ESTRATO_F)` estratos.
+
+
+
+
+Con la información recibida y con un nivel de confianza de al menos 95\% se estima lo siguiente:
+
+3. La participación ciudadana se encuentra entre `r porcentaje((analisis %>% dplyr::filter(LMU == 0) %>%  dplyr::select(PART) %>% pull), digits = 1)` y `r porcentaje((analisis %>% dplyr::filter(LMU == 2) %>% dplyr::select(PART) %>% pull), digits = 1)`. 
+4. El porcentaje de votos para cada candidatura a la Presidencia de los Estados Unidos Mexicanos se presenta a continuación:
+
+\renewcommand{\arraystretch}{1.2}
+
+```{r tabla_candidatos, echo = FALSE, include = TRUE, results='asis'}
+
+tabla <- tibble(Candidato = c("Ricardo Anaya Cortés",
+                              "José Antonio Meade Kuribreña",
+                              "Andrés Manuel López Obrador",
+                              "Jaime Heliodoro Rodríguez Calderón"),
+                PCI = c("PAN_PRD_MC",
+                        "PRI_PVEM_NA",
+                        "PT_MORENA_PES",
+                        "INDEPENDIENTE"),
+                Lim.inf = c(analisis %>% 
+                              dplyr::filter(LMU == 0) %>% 
+                              dplyr::select(RAC) %>% 
+                              pull,
+                            analisis %>% 
+                              dplyr::filter(LMU == 0) %>% 
+                              dplyr::select(JAMK) %>% 
+                              pull,
+                            analisis %>% 
+                              dplyr::filter(LMU == 0) %>% 
+                              dplyr::select(AMLO) %>% 
+                              pull,
+                            analisis %>% 
+                              dplyr::filter(LMU == 0) %>% 
+                              dplyr::select(JHRC) %>% 
+                              pull),
+                Lim.sup = c(analisis %>% 
+                              dplyr::filter(LMU == 2) %>% 
+                              dplyr::select(RAC) %>% 
+                              pull,
+                            analisis %>% 
+                              dplyr::filter(LMU == 2) %>% 
+                              dplyr::select(JAMK) %>% 
+                              pull,
+                            analisis %>% 
+                              dplyr::filter(LMU == 2) %>% 
+                              dplyr::select(AMLO) %>% 
+                              pull,
+                            analisis %>% 
+                              dplyr::filter(LMU == 2) %>% 
+                              dplyr::select(JHRC) %>% 
+                              pull))
+
+
+# Código para ordenar de mayor a menor
+#tabla %>% arrange(des(Lim.sup))
+
+# tabla$Lim.sup <- porcentaje(tabla$Lim.sup/100, digits = 1)
+# tabla$Lim.inf <- porcentaje(tabla$Lim.inf/100, digits = 1)
+tabla$Lim.sup <- round(tabla$Lim.sup, digits = 1)
+tabla$Lim.inf <- round(tabla$Lim.inf, digits = 1)
+
+# Cambia columnas tabla
+colnames(tabla) <- c("NOMBRE",
+                     "PARTIDO / COALICIÓN / INDEPENDIENTE",
+                     "LÍMITE INFERIOR",
+                     "LÍMITE SUPERIOR")
+
+
+knitr::kable(tabla,
+             format = "latex",
+             booktabs = TRUE,
+             align = "lccc") %>% 
+  kableExtra::column_spec(1, width="6.4cm") %>% 
+  kableExtra::column_spec(2, width="4.4cm") %>% 
+  kableExtra::column_spec(3:4, width="2.4cm") %>% 
+  kableExtra::kable_styling(font_size = 11.5) %>% 
+  kableExtra::add_header_above(c(" ", " ", "INTERVALO %" = 2))
+
+
+```
+
+
+
+
+
+
+
+
+
+\renewcommand{\arraystretch}{1}
+
+\begin{center}
+  Atentamente \\
+  Comité Técnico Asesor del Conteo Rápido
+\end{center}
+
+\begin{tabular}{ccc}
+& & \\
+& & \\
+\rule{.3\textwidth}{0.3pt} & \rule{.3\textwidth}{0.3pt} & \rule{.3\textwidth}{0.3pt}\\
+Dr. Alberto Alonso y Coria & Dra. Michelle Anzarut Chacalo & Dr. Carlos Hernández \\ 
+& & Garciadiego  \\
+& & \\
+& & \\
+\rule{.3\textwidth}{0.3pt} & \rule{.3\textwidth}{0.3pt} & \rule{.3\textwidth}{0.3pt}\\
+Dr. Manuel Mendoza Ramírez & Dr. Luis Enrique Nieto Barajas  & Dr. Gabriel Núñez Antonio  \\
+& & \\
+& & \\
+& & \\
+\rule{.3\textwidth}{0.3pt} & \rule{.3\textwidth}{0.3pt} & \rule{.3\textwidth}{0.3pt}\\
+Dr. Carlos Erwin Rodríguez  & Mtra. Patricia Isabel Romero & Dr. Raúl Rueda Díaz del  \\
+Hernández-Vela & Mares & Campo
+\end{tabular}
+
+
+\rfoot{Página 1 de 1}
+
