@@ -1,3 +1,5 @@
+# Mergers
+
 Code used to merge different estimations into a final estimation.
 
 In Chiapas, two estimations are merged by joiing the intervals and taking the mean of the point estimate.
